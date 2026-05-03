@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION      = "ap-northeast-1"
-        ECR_ACCOUNT_ID  = "508262720940"
+        ECR_ACCOUNT_ID  = "480415625061"
         ECR_REPO        = "${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mcp-platform/ai-assistant"
         IMAGE_NAME      = "${ECR_REPO}:${GIT_COMMIT}"
         GITOPS_REPO     = "https://github.com/QuntamVector/MCP-Project-GitOps.git"
