@@ -1,0 +1,94 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION      = "ap-northeast-1"
+        ECR_ACCOUNT_ID  = "508262720940"
+        ECR_REPO        = "${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mcp-platform/user-service"
+        IMAGE_NAME      = "${ECR_REPO}:${GIT_COMMIT}"
+        GITOPS_REPO     = "https://github.com/QuntamVector/MCP-Project-GitOps.git"
+        SERVICE_NAME    = "user-service"
+    }
+
+    stages {
+
+        stage('Git Checkout') {
+            steps {
+                git url: 'https://github.com/QuntamVector/MCP-Project-ALL-services.git', branch: 'main'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    printenv
+                    cd ${SERVICE_NAME} && docker build -t ${SERVICE_NAME}:latest .
+                '''
+            }
+        }
+
+        stage('ECR Login') {
+            steps {
+                sh '''
+                    aws ecr get-login-password --region ${AWS_REGION} \
+                    | docker login --username AWS --password-stdin \
+                      ${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                '''
+            }
+        }
+
+        stage('Tag Image') {
+            steps {
+                sh "docker tag ${SERVICE_NAME}:latest ${IMAGE_NAME}"
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                sh "docker push ${IMAGE_NAME}"
+            }
+        }
+
+        stage('Update GitOps Deployment') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USERNAME',
+                    passwordVariable: 'GIT_PASSWORD'
+                )]) {
+                    sh '''
+                        if [ -d "gitops" ]; then
+                            echo "gitops directory exists. Removing it..."
+                            rm -rf gitops
+                        fi
+
+                        git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/QuntamVector/MCP-Project-GitOps.git gitops
+                        cd gitops/base/${SERVICE_NAME}/
+
+                        git config user.email "jenkins@ci.com"
+                        git config user.name "jenkins"
+
+                        sed -i "s|image: .*user-service.*|image: ${IMAGE_NAME}|g" deployment.yaml
+
+                        git add .
+                        git commit -m "Update ${SERVICE_NAME} image to ${IMAGE_NAME}"
+                        git push origin main
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rmi ${IMAGE_NAME} || true"
+            sh "docker rmi ${SERVICE_NAME}:latest || true"
+        }
+        success {
+            echo "Build and push successful: ${IMAGE_NAME}"
+        }
+        failure {
+            echo "Pipeline failed. Check the logs above."
+        }
+    }
+}
