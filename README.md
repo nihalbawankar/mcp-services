@@ -1,11 +1,11 @@
-# MCP-Project-ALL-services
+# MCP-Platform-ALL-services
 
 
 ```
 #!/bin/bash
 
-ACCOUNT=508262720940
-REGION=ap-northeast-1
+ACCOUNT=480415625061
+REGION=ap-south-1
 
 for svc in mcp-api-gateway auth-service mcp-control-plane model-service ai-assistant recommendation-engine product-service user-service payment-service frontend; do
     aws ecr create-repository \
